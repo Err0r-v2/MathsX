@@ -226,12 +226,32 @@ struct CreateDeckView: View {
                                                         }
                                                     }
                                                     
-                                                    // Bouton pour ajouter plus d'images
+                                                    // Bouton pour prendre une photo
+                                                    Button(action: openCamera) {
+                                                        VStack(spacing: 8) {
+                                                            Image(systemName: "camera.fill")
+                                                                .font(.title2)
+                                                            Text("Photo")
+                                                                .font(.caption)
+                                                        }
+                                                        .foregroundStyle(.white)
+                                                        .frame(width: 120, height: 120)
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .fill(Color.white.opacity(0.06))
+                                                        )
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                        )
+                                                    }
+                                                    
+                                                    // Bouton pour ajouter depuis la galerie
                                                     Button(action: openGallery) {
                                                         VStack(spacing: 8) {
-                                                            Image(systemName: "plus")
+                                                            Image(systemName: "photo.fill")
                                                                 .font(.title2)
-                                                            Text("Ajouter")
+                                                            Text("Galerie")
                                                                 .font(.caption)
                                                         }
                                                         .foregroundStyle(.white)
