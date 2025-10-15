@@ -184,7 +184,7 @@ struct EditDeckView: View {
                                                         )
                                                         .overlay(
                                                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                                .stroke(Color.white.opacity(0.15), lineWidth: 1, style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                                                .stroke(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [5]))
                                                         )
                                                     }
                                                 }
