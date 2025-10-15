@@ -23,9 +23,10 @@ struct CreateDeckView: View {
     
     // IA States
     @State private var isAIExpanded: Bool = false
-    @State private var showImagePicker = false
+    @State private var showMultiImagePicker = false
     @State private var showCamera = false
-    @State private var selectedImage: UIImage? = nil
+    @State private var capturedImage: UIImage? = nil
+    @State private var selectedImages: [UIImage] = []
     @State private var aiInstructions = ""
     @State private var isProcessingAI = false
     @State private var aiError: String? = nil
@@ -199,24 +200,33 @@ struct CreateDeckView: View {
                                 }
                                 
                                 if isAIExpanded {
-                                    // Image selection
-                                    if let image = selectedImage {
-                                        ZStack(alignment: .topTrailing) {
-                                            Image(uiImage: image)
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(maxHeight: 200)
-                                                .cornerRadius(12)
-                                            
-                                            Button(action: { selectedImage = nil }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.title2)
-                                                    .foregroundStyle(.white)
-                                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                    // Image selection (multi)
+                                    VStack(spacing: 12) {
+                                        if !selectedImages.isEmpty {
+                                            // Thumbnails grid
+                                            ScrollView(.horizontal, showsIndicators: false) {
+                                                HStack(spacing: 10) {
+                                                    ForEach(Array(selectedImages.enumerated()), id: \.0) { index, image in
+                                                        ZStack(alignment: .topTrailing) {
+                                                            Image(uiImage: image)
+                                                                .resizable()
+                                                                .scaledToFill()
+                                                                .frame(width: 100, height: 100)
+                                                                .clipped()
+                                                                .cornerRadius(10)
+                                                            Button(action: { selectedImages.remove(at: index) }) {
+                                                                Image(systemName: "xmark.circle.fill")
+                                                                    .font(.subheadline)
+                                                                    .foregroundStyle(.white)
+                                                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                                            }
+                                                            .padding(4)
+                                                        }
+                                                    }
+                                                }
                                             }
-                                            .padding(8)
                                         }
-                                    } else {
+
                                         HStack(spacing: 12) {
                                             Button(action: openCamera) {
                                                 VStack(spacing: 8) {
@@ -237,12 +247,12 @@ struct CreateDeckView: View {
                                                         .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                                 )
                                             }
-                                            
+
                                             Button(action: openGallery) {
                                                 VStack(spacing: 8) {
-                                                    Image(systemName: "photo.fill")
+                                                    Image(systemName: "photo.on.rectangle.angled")
                                                         .font(.title2)
-                                                    Text("Galerie")
+                                                    Text("Galerie (multi)")
                                                         .font(.caption)
                                                 }
                                                 .foregroundStyle(.white)
@@ -301,8 +311,8 @@ struct CreateDeckView: View {
                                                 .fill(Theme.neon)
                                         )
                                     }
-                                    .disabled(selectedImage == nil || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImage == nil || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     // Error or success message
                                     if let aiError {
@@ -356,11 +366,17 @@ struct CreateDeckView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(image: $selectedImage, sourceType: .photoLibrary)
+            .sheet(isPresented: $showMultiImagePicker) {
+                MultiImagePicker(images: $selectedImages)
             }
             .sheet(isPresented: $showCamera) {
-                ImagePicker(image: $selectedImage, sourceType: .camera)
+                ImagePicker(image: $capturedImage, sourceType: .camera)
+            }
+            .onChange(of: capturedImage) { newValue in
+                if let image = newValue {
+                    selectedImages.append(image)
+                    capturedImage = nil
+                }
             }
         }
     }
@@ -391,17 +407,14 @@ struct CreateDeckView: View {
     }
     
     private func openGallery() {
-        guard UIImagePickerController.isSourceTypeAvailable(.photoLibrary) else {
-            aiError = "La galerie photo n'est pas disponible"
-            return
-        }
-        showImagePicker = true
+        // PHPicker ne nécessite pas de vérification de disponibilité comme UIImagePickerController
+        showMultiImagePicker = true
     }
     
     private func generateWithAI() {
-        guard let image = selectedImage else { 
+        guard !selectedImages.isEmpty else {
             aiError = "Aucune image sélectionnée"
-            return 
+            return
         }
         guard !aiInstructions.isEmpty else { 
             aiError = "Veuillez ajouter des instructions"
@@ -419,7 +432,7 @@ struct CreateDeckView: View {
         }
         
         print("Starting AI generation...")
-        print("Image size: \(image.size)")
+        print("Images count: \(selectedImages.count)")
         print("Instructions: \(aiInstructions)")
         
         Task {
@@ -429,19 +442,24 @@ struct CreateDeckView: View {
             }
             
             do {
-                print("Step 1: Calling MathPix...")
-                // Step 1: Recognize math with MathPix
-                let latexContent = try await MathPixService.shared.recognizeMath(
-                    from: image,
-                    appId: mathPixAppId,
-                    appKey: mathPixAppKey
-                )
-                print("MathPix result: \(latexContent)")
-                
+                print("Step 1: Calling MathPix for each image...")
+                var latexResults: [String] = []
+                for (idx, img) in selectedImages.enumerated() {
+                    print("MathPix image #\(idx+1) size: \(img.size)")
+                    let latexContent = try await MathPixService.shared.recognizeMath(
+                        from: img,
+                        appId: mathPixAppId,
+                        appKey: mathPixAppKey
+                    )
+                    latexResults.append(latexContent)
+                }
+                let combinedLatex = latexResults.joined(separator: "\n\n")
+                print("Combined LaTeX length: \(combinedLatex.count)")
+
                 print("Step 2: Calling Groq...")
                 // Step 2: Generate flashcards with Groq
                 let cards = try await GroqService.shared.generateFlashcards(
-                    latexContent: latexContent,
+                    latexContent: combinedLatex,
                     userInstructions: aiInstructions,
                     apiKey: groqKey
                 )
@@ -487,4 +505,6 @@ struct CreateDeckView: View {
             importError = "JSON invalide: \(error.localizedDescription)"
         }
     }
+    
+    
 }

@@ -53,7 +53,7 @@ struct HomeView: View {
                 SettingsView(settingsManager: settingsManager)
             }
             .sheet(item: $selectedDeck) { deck in
-                DeckDetailView(deck: deck, viewModel: viewModel)
+                DeckDetailView(deck: deck, viewModel: viewModel, settingsManager: settingsManager)
             }
             .sheet(item: $selectedFolder) { folder in
                 FolderView(folder: folder, viewModel: viewModel, settingsManager: settingsManager)

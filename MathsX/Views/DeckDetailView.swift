@@ -10,6 +10,7 @@ import SwiftUI
 struct DeckDetailView: View {
     let deck: Deck
     @ObservedObject var viewModel: DeckViewModel
+    @ObservedObject var settingsManager: SettingsManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingFlashcards = false
     @State private var showingQuiz = false
@@ -132,7 +133,7 @@ struct DeckDetailView: View {
             QuizView(deck: deck, viewModel: viewModel)
         }
         .sheet(isPresented: $showingEditDeck) {
-            EditDeckView(deckId: deck.id, viewModel: viewModel)
+            EditDeckView(deckId: deck.id, viewModel: viewModel, settingsManager: settingsManager)
         }
         .alert("Supprimer ce deck ?", isPresented: $showingDeleteDeckAlert) {
             Button("Annuler", role: .cancel) {}
