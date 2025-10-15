@@ -17,7 +17,6 @@ struct CreateDeckView: View {
     @State private var description = ""
     @State private var selectedColor = "purple"
     // Contrôles IA
-    @State private var cardRigor: Double = 0.6
     enum QuantityLevelUI: String, CaseIterable, Identifiable { case auto, peu, moyen, beaucoup; var id: String { rawValue } }
     @State private var quantityLevel: QuantityLevelUI = .auto
     
@@ -223,22 +222,6 @@ struct CreateDeckView: View {
                                             )
                                     }
 
-                                    // Rigeur
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack {
-                                            Text("Rigeur")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.white.opacity(0.7))
-                                            Spacer()
-                                            Text("\(Int(cardRigor * 100))%")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(.white.opacity(0.9))
-                                        }
-                                        Slider(value: $cardRigor, in: 0...1)
-                                            .tint(Theme.neon)
-                                            .padding(.vertical, 2)
-                                    }
-
                                     // Quantité (qualitative)
                                     VStack(alignment: .leading, spacing: 10) {
                                         Text("Quantité")
@@ -253,13 +236,16 @@ struct CreateDeckView: View {
                                         .pickerStyle(.segmented)
                                         .padding(.top, 2)
                                     }
+
+                                    // Spacer to separate from generate button
+                                    Spacer(minLength: 8)
                                     
                                     // Generate button
                                     Button(action: generateWithAI) {
                                         HStack(spacing: 8) {
                                             if isProcessingAI {
                                                 ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                                 Text("Génération en cours...")
                                             } else {
                                                 Image(systemName: "sparkles")
@@ -267,16 +253,16 @@ struct CreateDeckView: View {
                                             }
                                         }
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Theme.neon)
+                                            LinearGradient(colors: [Theme.neon, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         )
                                     }
-                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     // Error or success message
                                     if let aiError {
@@ -373,10 +359,7 @@ struct CreateDeckView: View {
     }
     
     private func generateWithAI() {
-        guard !selectedImages.isEmpty else {
-            aiError = "Aucune image sélectionnée"
-            return
-        }
+        // Les images sont désormais optionnelles
         guard !aiInstructions.isEmpty else { 
             aiError = "Veuillez ajouter des instructions"
             return 
@@ -422,7 +405,6 @@ struct CreateDeckView: View {
                 let cards = try await GroqService.shared.generateFlashcards(
                     latexContent: combinedLatex,
                     userInstructions: aiInstructions,
-                    rigor: cardRigor,
                     quantityLevel: mapQuantity(quantityLevel),
                     apiKey: groqKey
                 )

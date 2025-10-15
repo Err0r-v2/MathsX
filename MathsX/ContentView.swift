@@ -36,8 +36,8 @@ struct CustomBottomBar: View {
             bottomItem(icon: "square.grid.2x2", title: "Cartes", tab: .cartes)
             bottomItem(icon: "wand.and.stars", title: "Démo", tab: .demo)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
         .background(
             .ultraThinMaterial

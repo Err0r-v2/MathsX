@@ -49,7 +49,6 @@ class GroqService {
     func generateFlashcards(
         latexContent: String,
         userInstructions: String,
-        rigor: Double,
         quantityLevel: QuantityLevel,
         apiKey: String
     ) async throws -> [Flashcard] {
@@ -59,7 +58,6 @@ class GroqService {
         }
         
         // Remplacer les placeholders
-        let boundedRigor = max(0.0, min(1.0, rigor))
         let quantityText: String = {
             switch quantityLevel {
             case .auto: return "auto (laisse l'IA décider, viser 'moyen' par défaut)"
@@ -72,7 +70,6 @@ class GroqService {
         \(userInstructions)
 
         Contraintes de génération supplémentaires:
-        - Rigueur: \(Int(boundedRigor * 100))%
         - Quantité: \(quantityText)
         - Respecter strictement le format JSON demandé sans texte additionnel
         - Si 'auto', choisissez un volume de cartes raisonnable (moyen) selon le contenu

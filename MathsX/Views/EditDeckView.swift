@@ -25,7 +25,6 @@ struct EditDeckView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var aiInstructions: String = ""
     @State private var isProcessingAI: Bool = false
-    @State private var cardRigor: Double = 0.6
     enum QuantityLevelUI: String, CaseIterable, Identifiable { case auto, peu, moyen, beaucoup; var id: String { rawValue } }
     @State private var quantityLevel: QuantityLevelUI = .auto
     @State private var aiError: String? = nil
@@ -204,22 +203,6 @@ struct EditDeckView: View {
                                             )
                                     }
 
-                                    // Rigeur
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack {
-                                            Text("Rigeur")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.white.opacity(0.7))
-                                            Spacer()
-                                            Text("\(Int(cardRigor * 100))%")
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(.white.opacity(0.9))
-                                        }
-                                        Slider(value: $cardRigor, in: 0...1)
-                                            .tint(Theme.neon)
-                                            .padding(.vertical, 2)
-                                    }
-
                                     // Quantité (qualitative)
                                     VStack(alignment: .leading, spacing: 10) {
                                         Text("Quantité")
@@ -234,11 +217,14 @@ struct EditDeckView: View {
                                         .pickerStyle(.segmented)
                                         .padding(.top, 2)
                                     }
+
+                                    // Spacer to separate from generate button
+                                    Spacer(minLength: 8)
                                     Button(action: { Task { await generateWithAIAndAdd(to: currentDeck.id) } }) {
                                         HStack(spacing: 8) {
                                             if isProcessingAI {
                                                 ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                                 Text("Génération en cours...")
                                             } else {
                                                 Image(systemName: "sparkles")
@@ -246,16 +232,16 @@ struct EditDeckView: View {
                                             }
                                         }
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Theme.neon)
+                                            LinearGradient(colors: [Theme.neon, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         )
                                     }
-                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     if let aiError {
                                         HStack(spacing: 8) {
@@ -401,7 +387,6 @@ extension EditDeckView {
             let cards = try await GroqService.shared.generateFlashcards(
                 latexContent: combinedLatex,
                 userInstructions: aiInstructions,
-                rigor: cardRigor,
                 quantityLevel: mapQuantity(quantityLevel),
                 apiKey: groqKey
             )
