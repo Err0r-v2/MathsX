@@ -95,6 +95,14 @@ class DeckViewModel: ObservableObject {
         }
     }
     
+    func addCards(to deckId: UUID, cards: [Flashcard]) {
+        guard !cards.isEmpty else { return }
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].cards.append(contentsOf: cards)
+            saveDecks()
+        }
+    }
+    
     func updateCard(in deckId: UUID, card: Flashcard) {
         if let deckIndex = decks.firstIndex(where: { $0.id == deckId }),
            let cardIndex = decks[deckIndex].cards.firstIndex(where: { $0.id == card.id }) {
