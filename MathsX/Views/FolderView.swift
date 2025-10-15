@@ -51,7 +51,7 @@ struct FolderView: View {
             CreateFolderView(viewModel: viewModel, parentId: folder.id)
         }
         .sheet(item: $selectedDeck) { deck in
-            DeckDetailView(deck: deck, viewModel: viewModel)
+            DeckDetailView(deck: deck, viewModel: viewModel, settingsManager: settingsManager)
         }
         .sheet(item: $selectedFolder) { folder in
             FolderView(folder: folder, viewModel: viewModel, settingsManager: settingsManager)

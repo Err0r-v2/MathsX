@@ -6,15 +6,26 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct EditDeckView: View {
     let deckId: UUID
     @ObservedObject var viewModel: DeckViewModel
+    @ObservedObject var settingsManager: SettingsManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingCreateCard = false
     @State private var cardToDelete: Flashcard? = nil
     @State private var showingDeleteAlert = false
     @State private var cardToEdit: Flashcard? = nil
+    
+    // IA States
+    @State private var isAIExpanded: Bool = false
+    @State private var showMultiImagePicker = false
+    @State private var showCamera = false
+    @State private var selectedImages: [UIImage] = []
+    @State private var aiInstructions = ""
+    @State private var isProcessingAI = false
+    @State private var aiError: String? = nil
     
     private var deck: Deck? {
         viewModel.decks.first(where: { $0.id == deckId })
@@ -87,6 +98,236 @@ struct EditDeckView: View {
                             )
                         }
                         
+                        // AI Generation Section
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "sparkles")
+                                        .foregroundStyle(Theme.neon)
+                                    Text("Générer avec l'IA")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.white.opacity(0.7))
+                                }
+                                Spacer()
+                                Button(action: { withAnimation { isAIExpanded.toggle() } }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: isAIExpanded ? "chevron.up" : "chevron.down")
+                                        Text(isAIExpanded ? "Masquer" : "Afficher")
+                                    }
+                                    .font(.footnote.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                }
+                            }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.white.opacity(0.06))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                            
+                            if isAIExpanded {
+                                VStack(spacing: 16) {
+                                    // Images selection
+                                    if !selectedImages.isEmpty {
+                                        VStack(spacing: 12) {
+                                            HStack {
+                                                Text("\(selectedImages.count) image(s) sélectionnée(s)")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.white.opacity(0.7))
+                                                Spacer()
+                                                Button(action: { selectedImages.removeAll() }) {
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "trash")
+                                                        Text("Tout supprimer")
+                                                    }
+                                                    .font(.caption)
+                                                    .foregroundStyle(.red)
+                                                }
+                                            }
+                                            
+                                            ScrollView(.horizontal, showsIndicators: false) {
+                                                HStack(spacing: 12) {
+                                                    ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                                                        ZStack(alignment: .topTrailing) {
+                                                            Image(uiImage: image)
+                                                                .resizable()
+                                                                .scaledToFill()
+                                                                .frame(width: 120, height: 120)
+                                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                                            
+                                                            Button(action: { selectedImages.remove(at: index) }) {
+                                                                Image(systemName: "xmark.circle.fill")
+                                                                    .font(.title3)
+                                                                    .foregroundStyle(.white)
+                                                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                                            }
+                                                            .padding(4)
+                                                        }
+                                                    }
+                                                    
+                                                    // Bouton pour ajouter plus d'images
+                                                    Button(action: openGallery) {
+                                                        VStack(spacing: 8) {
+                                                            Image(systemName: "plus")
+                                                                .font(.title2)
+                                                            Text("Ajouter")
+                                                                .font(.caption)
+                                                        }
+                                                        .foregroundStyle(.white.opacity(0.7))
+                                                        .frame(width: 120, height: 120)
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .fill(Color.white.opacity(0.06))
+                                                        )
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .stroke(Color.white.opacity(0.15), lineWidth: 1, style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .padding(16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(Color.white.opacity(0.03))
+                                        )
+                                    } else {
+                                        HStack(spacing: 12) {
+                                            Button(action: openCamera) {
+                                                VStack(spacing: 8) {
+                                                    Image(systemName: "camera.fill")
+                                                        .font(.title2)
+                                                    Text("Photo")
+                                                        .font(.caption)
+                                                }
+                                                .foregroundStyle(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 20)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .fill(Color.white.opacity(0.06))
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                )
+                                            }
+                                            
+                                            Button(action: openGallery) {
+                                                VStack(spacing: 8) {
+                                                    Image(systemName: "photo.fill")
+                                                        .font(.title2)
+                                                    Text("Galerie")
+                                                        .font(.caption)
+                                                }
+                                                .foregroundStyle(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 20)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .fill(Color.white.opacity(0.06))
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                )
+                                            }
+                                        }
+                                        .padding(16)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(Color.white.opacity(0.03))
+                                        )
+                                    }
+                                    
+                                    // Instructions
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Instructions pour l'IA")
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                        
+                                        TextField("Ex: Crée des flashcards pour réviser ces formules", text: $aiInstructions)
+                                            .font(.body)
+                                            .foregroundStyle(.white)
+                                            .padding(14)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .fill(Color.white.opacity(0.06))
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                            )
+                                    }
+                                    .padding(.horizontal, 16)
+                                    
+                                    // Generate button
+                                    Button(action: generateWithAI) {
+                                        HStack(spacing: 8) {
+                                            if isProcessingAI {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                Text("Génération en cours...")
+                                            } else {
+                                                Image(systemName: "sparkles")
+                                                Text("Générer et ajouter au deck")
+                                            }
+                                        }
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(Theme.neon)
+                                        )
+                                    }
+                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .padding(.horizontal, 16)
+                                    
+                                    // Error or success message
+                                    if let aiError {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundStyle(.red)
+                                            Text(aiError)
+                                                .font(.footnote)
+                                        }
+                                        .foregroundStyle(.white.opacity(0.9))
+                                        .padding(10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(Color.red.opacity(0.1))
+                                        )
+                                        .padding(.horizontal, 16)
+                                    }
+                                    
+                                    // Info
+                                    if settingsManager.settings.groqApiKey.isEmpty || settingsManager.settings.mathPixAppId.isEmpty {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "info.circle")
+                                                .foregroundStyle(.orange)
+                                            Text("Configurez vos clés API dans les réglages")
+                                                .font(.footnote)
+                                        }
+                                        .foregroundStyle(.white.opacity(0.9))
+                                        .padding(10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(Color.orange.opacity(0.1))
+                                        )
+                                        .padding(.horizontal, 16)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        
                         // Cards list
                         if !currentDeck.cards.isEmpty {
                             VStack(alignment: .leading, spacing: 14) {
@@ -134,6 +375,15 @@ struct EditDeckView: View {
         .sheet(item: $cardToEdit) { card in
             EditCardView(deckId: currentDeck.id, card: card, viewModel: viewModel)
         }
+        .sheet(isPresented: $showMultiImagePicker) {
+            MultiImagePicker(images: $selectedImages)
+        }
+        .sheet(isPresented: $showCamera) {
+            ImagePicker(image: Binding(
+                get: { selectedImages.first },
+                set: { if let image = $0 { selectedImages.append(image) } }
+            ), sourceType: .camera)
+        }
         .alert("Supprimer la carte ?", isPresented: $showingDeleteAlert) {
             Button("Annuler", role: .cancel) { }
             Button("Supprimer", role: .destructive) {
@@ -143,6 +393,102 @@ struct EditDeckView: View {
             }
         } message: {
             Text("Cette action est irréversible.")
+        }
+    }
+    
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            aiError = "La caméra n'est pas disponible sur cet appareil"
+            return
+        }
+        showCamera = true
+    }
+    
+    private func openGallery() {
+        showMultiImagePicker = true
+    }
+    
+    private func generateWithAI() {
+        guard !selectedImages.isEmpty else { 
+            aiError = "Aucune image sélectionnée"
+            return 
+        }
+        guard !aiInstructions.isEmpty else { 
+            aiError = "Veuillez ajouter des instructions"
+            return 
+        }
+        
+        // Check API keys
+        let groqKey = settingsManager.settings.groqApiKey
+        let mathPixAppId = settingsManager.settings.mathPixAppId
+        let mathPixAppKey = settingsManager.settings.mathPixAppKey
+        
+        guard !groqKey.isEmpty, !mathPixAppId.isEmpty, !mathPixAppKey.isEmpty else {
+            aiError = "Veuillez configurer vos clés API dans les réglages"
+            return
+        }
+        
+        print("Starting AI generation with \(selectedImages.count) images...")
+        print("Instructions: \(aiInstructions)")
+        
+        Task {
+            await MainActor.run {
+                isProcessingAI = true
+                aiError = nil
+            }
+            
+            do {
+                var allCards: [Flashcard] = []
+                
+                // Process each image
+                for (index, image) in selectedImages.enumerated() {
+                    print("Processing image \(index + 1)/\(selectedImages.count)...")
+                    print("Image size: \(image.size)")
+                    
+                    print("Step 1: Calling MathPix for image \(index + 1)...")
+                    // Step 1: Recognize math with MathPix
+                    let latexContent = try await MathPixService.shared.recognizeMath(
+                        from: image,
+                        appId: mathPixAppId,
+                        appKey: mathPixAppKey
+                    )
+                    print("MathPix result for image \(index + 1): \(latexContent)")
+                    
+                    print("Step 2: Calling Groq for image \(index + 1)...")
+                    // Step 2: Generate flashcards with Groq
+                    let cards = try await GroqService.shared.generateFlashcards(
+                        latexContent: latexContent,
+                        userInstructions: aiInstructions,
+                        apiKey: groqKey
+                    )
+                    print("Generated \(cards.count) cards from image \(index + 1)")
+                    
+                    allCards.append(contentsOf: cards)
+                }
+                
+                print("Total cards generated: \(allCards.count)")
+                
+                await MainActor.run {
+                    // Add all generated cards to the deck
+                    for card in allCards {
+                        viewModel.addCard(to: deckId, card: card)
+                    }
+                    
+                    // Reset states
+                    selectedImages.removeAll()
+                    aiInstructions = ""
+                    isProcessingAI = false
+                    aiError = nil
+                    
+                    print("AI generation completed and cards added to deck")
+                }
+            } catch {
+                print("AI generation error: \(error)")
+                await MainActor.run {
+                    aiError = error.localizedDescription
+                    isProcessingAI = false
+                }
+            }
         }
     }
 }

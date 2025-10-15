@@ -23,9 +23,9 @@ struct CreateDeckView: View {
     
     // IA States
     @State private var isAIExpanded: Bool = false
-    @State private var showImagePicker = false
+    @State private var showMultiImagePicker = false
     @State private var showCamera = false
-    @State private var selectedImage: UIImage? = nil
+    @State private var selectedImages: [UIImage] = []
     @State private var aiInstructions = ""
     @State private var isProcessingAI = false
     @State private var aiError: String? = nil
@@ -199,22 +199,65 @@ struct CreateDeckView: View {
                                 }
                                 
                                 if isAIExpanded {
-                                    // Image selection
-                                    if let image = selectedImage {
-                                        ZStack(alignment: .topTrailing) {
-                                            Image(uiImage: image)
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(maxHeight: 200)
-                                                .cornerRadius(12)
-                                            
-                                            Button(action: { selectedImage = nil }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.title2)
-                                                    .foregroundStyle(.white)
-                                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                    // Images selection
+                                    if !selectedImages.isEmpty {
+                                        VStack(spacing: 12) {
+                                            HStack {
+                                                Text("\(selectedImages.count) image(s) sélectionnée(s)")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.white.opacity(0.7))
+                                                Spacer()
+                                                Button(action: { selectedImages.removeAll() }) {
+                                                    HStack(spacing: 4) {
+                                                        Image(systemName: "trash")
+                                                        Text("Tout supprimer")
+                                                    }
+                                                    .font(.caption)
+                                                    .foregroundStyle(.red)
+                                                }
                                             }
-                                            .padding(8)
+                                            
+                                            ScrollView(.horizontal, showsIndicators: false) {
+                                                HStack(spacing: 12) {
+                                                    ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                                                        ZStack(alignment: .topTrailing) {
+                                                            Image(uiImage: image)
+                                                                .resizable()
+                                                                .scaledToFill()
+                                                                .frame(width: 120, height: 120)
+                                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                                            
+                                                            Button(action: { selectedImages.remove(at: index) }) {
+                                                                Image(systemName: "xmark.circle.fill")
+                                                                    .font(.title3)
+                                                                    .foregroundStyle(.white)
+                                                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                                            }
+                                                            .padding(4)
+                                                        }
+                                                    }
+                                                    
+                                                    // Bouton pour ajouter plus d'images
+                                                    Button(action: openGallery) {
+                                                        VStack(spacing: 8) {
+                                                            Image(systemName: "plus")
+                                                                .font(.title2)
+                                                            Text("Ajouter")
+                                                                .font(.caption)
+                                                        }
+                                                        .foregroundStyle(.white.opacity(0.7))
+                                                        .frame(width: 120, height: 120)
+                                                        .background(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .fill(Color.white.opacity(0.06))
+                                                        )
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                                .stroke(Color.white.opacity(0.15), lineWidth: 1, style: StrokeStyle(lineWidth: 1, dash: [5]))
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     } else {
                                         HStack(spacing: 12) {
@@ -301,8 +344,8 @@ struct CreateDeckView: View {
                                                 .fill(Theme.neon)
                                         )
                                     }
-                                    .disabled(selectedImage == nil || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImage == nil || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     // Error or success message
                                     if let aiError {
@@ -356,11 +399,14 @@ struct CreateDeckView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(image: $selectedImage, sourceType: .photoLibrary)
+            .sheet(isPresented: $showMultiImagePicker) {
+                MultiImagePicker(images: $selectedImages)
             }
             .sheet(isPresented: $showCamera) {
-                ImagePicker(image: $selectedImage, sourceType: .camera)
+                ImagePicker(image: Binding(
+                    get: { selectedImages.first },
+                    set: { if let image = $0 { selectedImages.append(image) } }
+                ), sourceType: .camera)
             }
         }
     }
@@ -391,15 +437,11 @@ struct CreateDeckView: View {
     }
     
     private func openGallery() {
-        guard UIImagePickerController.isSourceTypeAvailable(.photoLibrary) else {
-            aiError = "La galerie photo n'est pas disponible"
-            return
-        }
-        showImagePicker = true
+        showMultiImagePicker = true
     }
     
     private func generateWithAI() {
-        guard let image = selectedImage else { 
+        guard !selectedImages.isEmpty else { 
             aiError = "Aucune image sélectionnée"
             return 
         }
@@ -418,8 +460,7 @@ struct CreateDeckView: View {
             return
         }
         
-        print("Starting AI generation...")
-        print("Image size: \(image.size)")
+        print("Starting AI generation with \(selectedImages.count) images...")
         print("Instructions: \(aiInstructions)")
         
         Task {
@@ -429,26 +470,38 @@ struct CreateDeckView: View {
             }
             
             do {
-                print("Step 1: Calling MathPix...")
-                // Step 1: Recognize math with MathPix
-                let latexContent = try await MathPixService.shared.recognizeMath(
-                    from: image,
-                    appId: mathPixAppId,
-                    appKey: mathPixAppKey
-                )
-                print("MathPix result: \(latexContent)")
+                var allCards: [Flashcard] = []
                 
-                print("Step 2: Calling Groq...")
-                // Step 2: Generate flashcards with Groq
-                let cards = try await GroqService.shared.generateFlashcards(
-                    latexContent: latexContent,
-                    userInstructions: aiInstructions,
-                    apiKey: groqKey
-                )
-                print("Generated \(cards.count) cards")
+                // Process each image
+                for (index, image) in selectedImages.enumerated() {
+                    print("Processing image \(index + 1)/\(selectedImages.count)...")
+                    print("Image size: \(image.size)")
+                    
+                    print("Step 1: Calling MathPix for image \(index + 1)...")
+                    // Step 1: Recognize math with MathPix
+                    let latexContent = try await MathPixService.shared.recognizeMath(
+                        from: image,
+                        appId: mathPixAppId,
+                        appKey: mathPixAppKey
+                    )
+                    print("MathPix result for image \(index + 1): \(latexContent)")
+                    
+                    print("Step 2: Calling Groq for image \(index + 1)...")
+                    // Step 2: Generate flashcards with Groq
+                    let cards = try await GroqService.shared.generateFlashcards(
+                        latexContent: latexContent,
+                        userInstructions: aiInstructions,
+                        apiKey: groqKey
+                    )
+                    print("Generated \(cards.count) cards from image \(index + 1)")
+                    
+                    allCards.append(contentsOf: cards)
+                }
+                
+                print("Total cards generated: \(allCards.count)")
                 
                 await MainActor.run {
-                    aiGeneratedCards = cards
+                    aiGeneratedCards = allCards
                     isProcessingAI = false
                     print("AI generation completed successfully")
                 }
