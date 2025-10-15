@@ -25,6 +25,8 @@ struct EditDeckView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var aiInstructions: String = ""
     @State private var isProcessingAI: Bool = false
+    enum QuantityLevelUI: String, CaseIterable, Identifiable { case auto, peu, moyen, beaucoup; var id: String { rawValue } }
+    @State private var quantityLevel: QuantityLevelUI = .auto
     @State private var aiError: String? = nil
     
     private var deck: Deck? {
@@ -200,11 +202,29 @@ struct EditDeckView: View {
                                                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                             )
                                     }
+
+                                    // Quantité (qualitative)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("Quantité")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                        Picker("Quantité", selection: $quantityLevel) {
+                                            Text("Auto").tag(QuantityLevelUI.auto)
+                                            Text("Peu").tag(QuantityLevelUI.peu)
+                                            Text("Moyen").tag(QuantityLevelUI.moyen)
+                                            Text("Beaucoup").tag(QuantityLevelUI.beaucoup)
+                                        }
+                                        .pickerStyle(.segmented)
+                                        .padding(.top, 2)
+                                    }
+
+                                    // Spacer to separate from generate button
+                                    Spacer(minLength: 8)
                                     Button(action: { Task { await generateWithAIAndAdd(to: currentDeck.id) } }) {
                                         HStack(spacing: 8) {
                                             if isProcessingAI {
                                                 ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                                 Text("Génération en cours...")
                                             } else {
                                                 Image(systemName: "sparkles")
@@ -212,16 +232,16 @@ struct EditDeckView: View {
                                             }
                                         }
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Theme.neon)
+                                            LinearGradient(colors: [Theme.neon, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         )
                                     }
-                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     if let aiError {
                                         HStack(spacing: 8) {
@@ -367,6 +387,7 @@ extension EditDeckView {
             let cards = try await GroqService.shared.generateFlashcards(
                 latexContent: combinedLatex,
                 userInstructions: aiInstructions,
+                quantityLevel: mapQuantity(quantityLevel),
                 apiKey: groqKey
             )
 
@@ -381,6 +402,17 @@ extension EditDeckView {
                 aiError = error.localizedDescription
                 isProcessingAI = false
             }
+        }
+    }
+}
+
+extension EditDeckView {
+    private func mapQuantity(_ level: QuantityLevelUI) -> QuantityLevel {
+        switch level {
+        case .auto: return .auto
+        case .peu: return .peu
+        case .moyen: return .moyen
+        case .beaucoup: return .beaucoup
         }
     }
 }

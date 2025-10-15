@@ -16,10 +16,9 @@ struct CreateDeckView: View {
     @State private var name = ""
     @State private var description = ""
     @State private var selectedColor = "purple"
-    @State private var rawImportText = ""
-    @State private var importedCards: [Flashcard] = []
-    @State private var importError: String? = nil
-    @State private var isImportExpanded: Bool = false
+    // Contrôles IA
+    enum QuantityLevelUI: String, CaseIterable, Identifiable { case auto, peu, moyen, beaucoup; var id: String { rawValue } }
+    @State private var quantityLevel: QuantityLevelUI = .auto
     
     // IA States
     @State private var isAIExpanded: Bool = false
@@ -109,74 +108,7 @@ struct CreateDeckView: View {
                                     )
                             }
 
-                            // Raw JSON import section
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Import rapide (JSON brut)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.7))
-                                    Spacer()
-                                    Button(action: { withAnimation { isImportExpanded.toggle() } }) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: isImportExpanded ? "chevron.up" : "chevron.down")
-                                            Text(isImportExpanded ? "Masquer" : "Afficher")
-                                        }
-                                        .font(.footnote.weight(.medium))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                    }
-                                }
-                                if isImportExpanded {
-                                    TextEditor(text: $rawImportText)
-                                        .font(.system(size: 14, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .frame(minHeight: 140)
-                                        .scrollContentBackground(.hidden)
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Color.white.opacity(0.06))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                        )
-                                        .onChange(of: rawImportText) { _ in
-                                            parseRawImport()
-                                        }
-
-                                    if let importError {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundStyle(.yellow)
-                                            Text(importError)
-                                                .font(.footnote)
-                                        }
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(Color.yellow.opacity(0.1))
-                                        )
-                                    } else if !importedCards.isEmpty {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "checkmark.seal.fill")
-                                                .foregroundStyle(Theme.neon)
-                                            Text("\(importedCards.count) cartes prêtes à être ajoutées")
-                                                .font(.footnote)
-                                        }
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(Theme.neon.opacity(0.08))
-                                        )
-                                    } else {
-                                        Text("Collez un tableau JSON d'objets { front, back, isLatex }.")
-                                            .font(.footnote)
-                                            .foregroundStyle(.white.opacity(0.6))
-                                    }
-                                }
-                            }
+                            // (Supprimé) Import rapide JSON brut
                             
                             // AI Generation Section
                             VStack(alignment: .leading, spacing: 8) {
@@ -289,13 +221,31 @@ struct CreateDeckView: View {
                                                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                             )
                                     }
+
+                                    // Quantité (qualitative)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("Quantité")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                        Picker("Quantité", selection: $quantityLevel) {
+                                            Text("Auto").tag(QuantityLevelUI.auto)
+                                            Text("Peu").tag(QuantityLevelUI.peu)
+                                            Text("Moyen").tag(QuantityLevelUI.moyen)
+                                            Text("Beaucoup").tag(QuantityLevelUI.beaucoup)
+                                        }
+                                        .pickerStyle(.segmented)
+                                        .padding(.top, 2)
+                                    }
+
+                                    // Spacer to separate from generate button
+                                    Spacer(minLength: 8)
                                     
                                     // Generate button
                                     Button(action: generateWithAI) {
                                         HStack(spacing: 8) {
                                             if isProcessingAI {
                                                 ProgressView()
-                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                                 Text("Génération en cours...")
                                             } else {
                                                 Image(systemName: "sparkles")
@@ -303,16 +253,16 @@ struct CreateDeckView: View {
                                             }
                                         }
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 12)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Theme.neon)
+                                            LinearGradient(colors: [Theme.neon, Color.cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         )
                                     }
-                                    .disabled(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI)
-                                    .opacity(selectedImages.isEmpty || aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
+                                    .disabled(aiInstructions.isEmpty || isProcessingAI)
+                                    .opacity(aiInstructions.isEmpty || isProcessingAI ? 0.5 : 1)
                                     
                                     // Error or success message
                                     if let aiError {
@@ -388,9 +338,6 @@ struct CreateDeckView: View {
             color: selectedColor,
             folderId: folderId
         )
-        if !importedCards.isEmpty {
-            newDeck.cards.append(contentsOf: importedCards)
-        }
         if !aiGeneratedCards.isEmpty {
             newDeck.cards.append(contentsOf: aiGeneratedCards)
         }
@@ -412,10 +359,7 @@ struct CreateDeckView: View {
     }
     
     private func generateWithAI() {
-        guard !selectedImages.isEmpty else {
-            aiError = "Aucune image sélectionnée"
-            return
-        }
+        // Les images sont désormais optionnelles
         guard !aiInstructions.isEmpty else { 
             aiError = "Veuillez ajouter des instructions"
             return 
@@ -461,6 +405,7 @@ struct CreateDeckView: View {
                 let cards = try await GroqService.shared.generateFlashcards(
                     latexContent: combinedLatex,
                     userInstructions: aiInstructions,
+                    quantityLevel: mapQuantity(quantityLevel),
                     apiKey: groqKey
                 )
                 print("Generated \(cards.count) cards")
@@ -480,31 +425,13 @@ struct CreateDeckView: View {
         }
     }
 
-    private func parseRawImport() {
-        importError = nil
-        importedCards = []
-        let trimmed = rawImportText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let data = trimmed.data(using: .utf8) else {
-            importError = "Encodage invalide."
-            return
-        }
-        do {
-            struct ImportedCard: Decodable {
-                let front: String
-                let back: String
-                let isLatex: Bool?
-            }
-            let decoder = JSONDecoder()
-            let items = try decoder.decode([ImportedCard].self, from: data)
-            let cards = items.map { item in
-                Flashcard(front: item.front, back: item.back, isLatex: item.isLatex ?? true)
-            }
-            importedCards = cards
-        } catch {
-            importError = "JSON invalide: \(error.localizedDescription)"
+    private func mapQuantity(_ level: QuantityLevelUI) -> QuantityLevel {
+        switch level {
+        case .auto: return .auto
+        case .peu: return .peu
+        case .moyen: return .moyen
+        case .beaucoup: return .beaucoup
         }
     }
-    
     
 }

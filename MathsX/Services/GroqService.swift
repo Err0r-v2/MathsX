@@ -7,6 +7,13 @@
 
 import Foundation
 
+public enum QuantityLevel: String, CaseIterable, Codable {
+    case auto
+    case peu
+    case moyen
+    case beaucoup
+}
+
 struct GroqMessage: Codable {
     let role: String
     let content: String
@@ -39,16 +46,37 @@ class GroqService {
     
     private init() {}
     
-    func generateFlashcards(latexContent: String, userInstructions: String, apiKey: String) async throws -> [Flashcard] {
+    func generateFlashcards(
+        latexContent: String,
+        userInstructions: String,
+        quantityLevel: QuantityLevel,
+        apiKey: String
+    ) async throws -> [Flashcard] {
         // Charger le prompt depuis le fichier
         guard let promptTemplate = loadPromptTemplate() else {
             throw GroqError.promptLoadFailed
         }
         
         // Remplacer les placeholders
+        let quantityText: String = {
+            switch quantityLevel {
+            case .auto: return "auto (laisse l'IA décider, viser 'moyen' par défaut)"
+            case .peu: return "peu"
+            case .moyen: return "moyen"
+            case .beaucoup: return "beaucoup"
+            }
+        }()
+        let combinedInstructions = """
+        \(userInstructions)
+
+        Contraintes de génération supplémentaires:
+        - Quantité: \(quantityText)
+        - Respecter strictement le format JSON demandé sans texte additionnel
+        - Si 'auto', choisissez un volume de cartes raisonnable (moyen) selon le contenu
+        """
         let prompt = promptTemplate
             .replacingOccurrences(of: "{latex_content}", with: latexContent)
-            .replacingOccurrences(of: "{user_instructions}", with: userInstructions)
+            .replacingOccurrences(of: "{user_instructions}", with: combinedInstructions)
         
         let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         var request = URLRequest(url: url)
@@ -56,13 +84,25 @@ class GroqService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
+        // Température fixe: la rigueur est sémantique, pas un réglage de sampling
+        let mappedTemperature = 0.3
+        // Adapter grossièrement le budget de tokens à la quantité souhaitée (qualitative)
+        let mappedMaxTokens: Int = {
+            switch quantityLevel {
+            case .auto: return 2000
+            case .peu: return 1200
+            case .moyen: return 2200
+            case .beaucoup: return 3400
+            }
+        }()
+        
         let groqRequest = GroqRequest(
             model: "moonshotai/kimi-k2-instruct-0905",
             messages: [
                 GroqMessage(role: "user", content: prompt)
             ],
-            temperature: 0.3,
-            maxTokens: 4000
+            temperature: mappedTemperature,
+            maxTokens: mappedMaxTokens
         )
         
         request.httpBody = try JSONEncoder().encode(groqRequest)
