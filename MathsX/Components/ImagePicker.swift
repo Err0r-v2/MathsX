@@ -31,7 +31,7 @@ struct ImagePicker: UIViewControllerRepresentable {
                 }
             })
             
-            let hostingController = UIHostingController(rootView: EmptyView())
+            _ = UIHostingController(rootView: EmptyView())
             DispatchQueue.main.async {
                 if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                    let window = scene.windows.first {

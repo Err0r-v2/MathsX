@@ -98,7 +98,7 @@ class GroqService {
     
     private func loadPromptTemplate() -> String? {
         guard let url = Bundle.main.url(forResource: "prompts", withExtension: "txt"),
-              let content = try? String(contentsOf: url) else {
+              let content = try? String(contentsOf: url, encoding: .utf8) else {
             // Fallback si le fichier n'est pas trouvé
             return """
             Tu es un assistant spécialisé dans la création de flashcards mathématiques.

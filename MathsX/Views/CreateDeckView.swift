@@ -139,7 +139,7 @@ struct CreateDeckView: View {
                                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                         )
-                                        .onChange(of: rawImportText) { _ in
+                                        .onChange(of: rawImportText) {
                                             parseRawImport()
                                         }
 
