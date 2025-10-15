@@ -16,10 +16,9 @@ struct CreateDeckView: View {
     @State private var name = ""
     @State private var description = ""
     @State private var selectedColor = "purple"
-    @State private var rawImportText = ""
-    @State private var importedCards: [Flashcard] = []
-    @State private var importError: String? = nil
-    @State private var isImportExpanded: Bool = false
+    // Contrôles IA
+    @State private var cardRigor: Double = 0.6
+    @State private var cardQuantity: Double = 10
     
     // IA States
     @State private var isAIExpanded: Bool = false
@@ -109,74 +108,7 @@ struct CreateDeckView: View {
                                     )
                             }
 
-                            // Raw JSON import section
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Import rapide (JSON brut)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.7))
-                                    Spacer()
-                                    Button(action: { withAnimation { isImportExpanded.toggle() } }) {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: isImportExpanded ? "chevron.up" : "chevron.down")
-                                            Text(isImportExpanded ? "Masquer" : "Afficher")
-                                        }
-                                        .font(.footnote.weight(.medium))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                    }
-                                }
-                                if isImportExpanded {
-                                    TextEditor(text: $rawImportText)
-                                        .font(.system(size: 14, design: .monospaced))
-                                        .foregroundStyle(.white)
-                                        .frame(minHeight: 140)
-                                        .scrollContentBackground(.hidden)
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Color.white.opacity(0.06))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                        )
-                                        .onChange(of: rawImportText) { _ in
-                                            parseRawImport()
-                                        }
-
-                                    if let importError {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundStyle(.yellow)
-                                            Text(importError)
-                                                .font(.footnote)
-                                        }
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(Color.yellow.opacity(0.1))
-                                        )
-                                    } else if !importedCards.isEmpty {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "checkmark.seal.fill")
-                                                .foregroundStyle(Theme.neon)
-                                            Text("\(importedCards.count) cartes prêtes à être ajoutées")
-                                                .font(.footnote)
-                                        }
-                                        .foregroundStyle(.white.opacity(0.9))
-                                        .padding(10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(Theme.neon.opacity(0.08))
-                                        )
-                                    } else {
-                                        Text("Collez un tableau JSON d'objets { front, back, isLatex }.")
-                                            .font(.footnote)
-                                            .foregroundStyle(.white.opacity(0.6))
-                                    }
-                                }
-                            }
+                            // (Supprimé) Import rapide JSON brut
                             
                             // AI Generation Section
                             VStack(alignment: .leading, spacing: 8) {
@@ -289,6 +221,36 @@ struct CreateDeckView: View {
                                                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                             )
                                     }
+
+                                    // Rigueur des cartes
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Rigueur des cartes")
+                                                .font(.caption)
+                                                .foregroundStyle(.white.opacity(0.7))
+                                            Spacer()
+                                            Text("\(Int(cardRigor * 100))%")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.white.opacity(0.9))
+                                        }
+                                        Slider(value: $cardRigor, in: 0...1)
+                                            .tint(Theme.neon)
+                                    }
+
+                                    // Quantité (approx.)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Quantité (approx.)")
+                                                .font(.caption)
+                                                .foregroundStyle(.white.opacity(0.7))
+                                            Spacer()
+                                            Text("\(Int(cardQuantity))")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.white.opacity(0.9))
+                                        }
+                                        Slider(value: $cardQuantity, in: 1...30, step: 1)
+                                            .tint(Theme.neon)
+                                    }
                                     
                                     // Generate button
                                     Button(action: generateWithAI) {
@@ -388,9 +350,6 @@ struct CreateDeckView: View {
             color: selectedColor,
             folderId: folderId
         )
-        if !importedCards.isEmpty {
-            newDeck.cards.append(contentsOf: importedCards)
-        }
         if !aiGeneratedCards.isEmpty {
             newDeck.cards.append(contentsOf: aiGeneratedCards)
         }
@@ -461,6 +420,8 @@ struct CreateDeckView: View {
                 let cards = try await GroqService.shared.generateFlashcards(
                     latexContent: combinedLatex,
                     userInstructions: aiInstructions,
+                    rigor: cardRigor,
+                    quantityHint: Int(cardQuantity),
                     apiKey: groqKey
                 )
                 print("Generated \(cards.count) cards")
@@ -479,32 +440,5 @@ struct CreateDeckView: View {
             }
         }
     }
-
-    private func parseRawImport() {
-        importError = nil
-        importedCards = []
-        let trimmed = rawImportText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        guard let data = trimmed.data(using: .utf8) else {
-            importError = "Encodage invalide."
-            return
-        }
-        do {
-            struct ImportedCard: Decodable {
-                let front: String
-                let back: String
-                let isLatex: Bool?
-            }
-            let decoder = JSONDecoder()
-            let items = try decoder.decode([ImportedCard].self, from: data)
-            let cards = items.map { item in
-                Flashcard(front: item.front, back: item.back, isLatex: item.isLatex ?? true)
-            }
-            importedCards = cards
-        } catch {
-            importError = "JSON invalide: \(error.localizedDescription)"
-        }
-    }
-    
     
 }

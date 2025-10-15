@@ -25,6 +25,8 @@ struct EditDeckView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var aiInstructions: String = ""
     @State private var isProcessingAI: Bool = false
+    @State private var cardRigor: Double = 0.6
+    @State private var cardQuantity: Double = 10
     @State private var aiError: String? = nil
     
     private var deck: Deck? {
@@ -200,6 +202,36 @@ struct EditDeckView: View {
                                                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                             )
                                     }
+
+                                    // Rigueur des cartes
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Rigueur des cartes")
+                                                .font(.caption)
+                                                .foregroundStyle(.white.opacity(0.7))
+                                            Spacer()
+                                            Text("\(Int(cardRigor * 100))%")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.white.opacity(0.9))
+                                        }
+                                        Slider(value: $cardRigor, in: 0...1)
+                                            .tint(Theme.neon)
+                                    }
+
+                                    // Quantité (approx.)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Quantité (approx.)")
+                                                .font(.caption)
+                                                .foregroundStyle(.white.opacity(0.7))
+                                            Spacer()
+                                            Text("\(Int(cardQuantity))")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.white.opacity(0.9))
+                                        }
+                                        Slider(value: $cardQuantity, in: 1...30, step: 1)
+                                            .tint(Theme.neon)
+                                    }
                                     Button(action: { Task { await generateWithAIAndAdd(to: currentDeck.id) } }) {
                                         HStack(spacing: 8) {
                                             if isProcessingAI {
@@ -367,6 +399,8 @@ extension EditDeckView {
             let cards = try await GroqService.shared.generateFlashcards(
                 latexContent: combinedLatex,
                 userInstructions: aiInstructions,
+                rigor: cardRigor,
+                quantityHint: Int(cardQuantity),
                 apiKey: groqKey
             )
 

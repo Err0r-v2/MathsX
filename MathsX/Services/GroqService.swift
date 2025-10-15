@@ -39,16 +39,32 @@ class GroqService {
     
     private init() {}
     
-    func generateFlashcards(latexContent: String, userInstructions: String, apiKey: String) async throws -> [Flashcard] {
+    func generateFlashcards(
+        latexContent: String,
+        userInstructions: String,
+        rigor: Double,
+        quantityHint: Int,
+        apiKey: String
+    ) async throws -> [Flashcard] {
         // Charger le prompt depuis le fichier
         guard let promptTemplate = loadPromptTemplate() else {
             throw GroqError.promptLoadFailed
         }
         
         // Remplacer les placeholders
+        let boundedRigor = max(0.0, min(1.0, rigor))
+        let boundedQuantity = max(1, min(100, quantityHint))
+        let combinedInstructions = """
+        \(userInstructions)
+        
+        Contraintes de génération supplémentaires:
+        - Rigueur souhaitée: \(Int(boundedRigor * 100))%
+        - Quantité approximative de cartes: \(boundedQuantity)
+        - Respecter strictement le format JSON demandé sans texte additionnel
+        """
         let prompt = promptTemplate
             .replacingOccurrences(of: "{latex_content}", with: latexContent)
-            .replacingOccurrences(of: "{user_instructions}", with: userInstructions)
+            .replacingOccurrences(of: "{user_instructions}", with: combinedInstructions)
         
         let url = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         var request = URLRequest(url: url)
@@ -56,13 +72,18 @@ class GroqService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
+        // Mapper la rigueur sur la température (plus de rigueur => plus déterministe)
+        let mappedTemperature = max(0.2, min(0.8, 0.8 - 0.5 * boundedRigor))
+        // Adapter grossièrement le budget de tokens à la quantité souhaitée
+        let mappedMaxTokens = min(4000, max(800, boundedQuantity * 220))
+        
         let groqRequest = GroqRequest(
             model: "moonshotai/kimi-k2-instruct-0905",
             messages: [
                 GroqMessage(role: "user", content: prompt)
             ],
-            temperature: 0.3,
-            maxTokens: 4000
+            temperature: mappedTemperature,
+            maxTokens: mappedMaxTokens
         )
         
         request.httpBody = try JSONEncoder().encode(groqRequest)

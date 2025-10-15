@@ -17,7 +17,6 @@ struct FolderView: View {
     @State private var showingCreateFolder = false
     @State private var selectedDeck: Deck?
     @State private var searchText: String = ""
-    @State private var isSearching: Bool = false
     @State private var deckToDelete: Deck? = nil
     @State private var folderToDelete: Folder? = nil
     @State private var showingDeleteDeckAlert = false
@@ -26,7 +25,7 @@ struct FolderView: View {
     @State private var deckToMove: Deck? = nil
     
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             Theme.backgroundGradient.ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -36,12 +35,8 @@ struct FolderView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
-                .padding(.bottom, isSearching ? 8 : 20)
+                .padding(.bottom, 20)
             }
-
-            // Overlay search bar centered at bottom
-            searchBar
-                .frame(maxWidth: .infinity)
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showingCreateDeck) {
@@ -123,6 +118,27 @@ struct FolderView: View {
                 
                 Spacer()
             }
+
+            // Inline search bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 16))
+                TextField("Rechercher...", text: $searchText)
+                    .foregroundStyle(.white)
+                    .tint(.white)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
         }
     }
     
@@ -237,89 +253,11 @@ struct FolderView: View {
                     )
                 }
             }
-            // Extra bottom spacer
-            Color.clear.frame(height: isSearching ? 120 : 100)
+            // Bottom spacer
+            Color.clear.frame(height: 40)
         }
     }
     
-    private var searchBar: some View {
-        VStack(spacing: 0) {
-            if isSearching {
-                HStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.white.opacity(0.6))
-                            .font(.system(size: 16))
-                        
-                        TextField("Rechercher...", text: $searchText)
-                            .foregroundStyle(.white)
-                            .tint(.white)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.6)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
-                    
-                    Button("Annuler") {
-                        isSearching = false
-                        searchText = ""
-                        hideKeyboard()
-                    }
-                    .foregroundStyle(.white.opacity(0.8))
-                    .font(.system(size: 16))
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else {
-                HStack(spacing: 12) {
-                    Spacer()
-                    
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isSearching = true
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 16))
-                            Text("Rechercher")
-                                .font(.system(size: 16))
-                        }
-                        .foregroundStyle(.white.opacity(0.8))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                                .opacity(0.4)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                        )
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: isSearching)
-    }
-    
-    private func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    }
     
     private func colorFromString(_ string: String) -> Color {
         switch string {
