@@ -87,8 +87,8 @@ class GroqService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
-        // Mapper la rigueur sur la température (plus de rigueur => plus déterministe)
-        let mappedTemperature = max(0.2, min(0.8, 0.8 - 0.5 * boundedRigor))
+        // Température fixe: la rigueur est sémantique, pas un réglage de sampling
+        let mappedTemperature = 0.3
         // Adapter grossièrement le budget de tokens à la quantité souhaitée (qualitative)
         let mappedMaxTokens: Int = {
             switch quantityLevel {
