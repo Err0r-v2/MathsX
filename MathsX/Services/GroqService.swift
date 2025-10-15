@@ -7,6 +7,13 @@
 
 import Foundation
 
+public enum QuantityLevel: String, CaseIterable, Codable {
+    case auto
+    case peu
+    case moyen
+    case beaucoup
+}
+
 struct GroqMessage: Codable {
     let role: String
     let content: String
@@ -43,7 +50,7 @@ class GroqService {
         latexContent: String,
         userInstructions: String,
         rigor: Double,
-        quantityHint: Int,
+        quantityLevel: QuantityLevel,
         apiKey: String
     ) async throws -> [Flashcard] {
         // Charger le prompt depuis le fichier
@@ -53,14 +60,22 @@ class GroqService {
         
         // Remplacer les placeholders
         let boundedRigor = max(0.0, min(1.0, rigor))
-        let boundedQuantity = max(1, min(100, quantityHint))
+        let quantityText: String = {
+            switch quantityLevel {
+            case .auto: return "auto (laisse l'IA décider, viser 'moyen' par défaut)"
+            case .peu: return "peu"
+            case .moyen: return "moyen"
+            case .beaucoup: return "beaucoup"
+            }
+        }()
         let combinedInstructions = """
         \(userInstructions)
-        
+
         Contraintes de génération supplémentaires:
-        - Rigueur souhaitée: \(Int(boundedRigor * 100))%
-        - Quantité approximative de cartes: \(boundedQuantity)
+        - Rigueur: \(Int(boundedRigor * 100))%
+        - Quantité: \(quantityText)
         - Respecter strictement le format JSON demandé sans texte additionnel
+        - Si 'auto', choisissez un volume de cartes raisonnable (moyen) selon le contenu
         """
         let prompt = promptTemplate
             .replacingOccurrences(of: "{latex_content}", with: latexContent)
@@ -74,8 +89,15 @@ class GroqService {
         
         // Mapper la rigueur sur la température (plus de rigueur => plus déterministe)
         let mappedTemperature = max(0.2, min(0.8, 0.8 - 0.5 * boundedRigor))
-        // Adapter grossièrement le budget de tokens à la quantité souhaitée
-        let mappedMaxTokens = min(4000, max(800, boundedQuantity * 220))
+        // Adapter grossièrement le budget de tokens à la quantité souhaitée (qualitative)
+        let mappedMaxTokens: Int = {
+            switch quantityLevel {
+            case .auto: return 2000
+            case .peu: return 1200
+            case .moyen: return 2200
+            case .beaucoup: return 3400
+            }
+        }()
         
         let groqRequest = GroqRequest(
             model: "moonshotai/kimi-k2-instruct-0905",

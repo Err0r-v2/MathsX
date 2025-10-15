@@ -18,7 +18,8 @@ struct CreateDeckView: View {
     @State private var selectedColor = "purple"
     // Contrôles IA
     @State private var cardRigor: Double = 0.6
-    @State private var cardQuantity: Double = 10
+    enum QuantityLevelUI: String, CaseIterable, Identifiable { case auto, peu, moyen, beaucoup; var id: String { rawValue } }
+    @State private var quantityLevel: QuantityLevelUI = .auto
     
     // IA States
     @State private var isAIExpanded: Bool = false
@@ -222,34 +223,35 @@ struct CreateDeckView: View {
                                             )
                                     }
 
-                                    // Rigueur des cartes
-                                    VStack(alignment: .leading, spacing: 8) {
+                                    // Rigeur
+                                    VStack(alignment: .leading, spacing: 10) {
                                         HStack {
-                                            Text("Rigueur des cartes")
-                                                .font(.caption)
+                                            Text("Rigeur")
+                                                .font(.subheadline)
                                                 .foregroundStyle(.white.opacity(0.7))
                                             Spacer()
                                             Text("\(Int(cardRigor * 100))%")
-                                                .font(.caption.weight(.semibold))
+                                                .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(.white.opacity(0.9))
                                         }
                                         Slider(value: $cardRigor, in: 0...1)
                                             .tint(Theme.neon)
+                                            .padding(.vertical, 2)
                                     }
 
-                                    // Quantité (approx.)
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack {
-                                            Text("Quantité (approx.)")
-                                                .font(.caption)
-                                                .foregroundStyle(.white.opacity(0.7))
-                                            Spacer()
-                                            Text("\(Int(cardQuantity))")
-                                                .font(.caption.weight(.semibold))
-                                                .foregroundStyle(.white.opacity(0.9))
+                                    // Quantité (qualitative)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("Quantité")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                        Picker("Quantité", selection: $quantityLevel) {
+                                            Text("Auto").tag(QuantityLevelUI.auto)
+                                            Text("Peu").tag(QuantityLevelUI.peu)
+                                            Text("Moyen").tag(QuantityLevelUI.moyen)
+                                            Text("Beaucoup").tag(QuantityLevelUI.beaucoup)
                                         }
-                                        Slider(value: $cardQuantity, in: 1...30, step: 1)
-                                            .tint(Theme.neon)
+                                        .pickerStyle(.segmented)
+                                        .padding(.top, 2)
                                     }
                                     
                                     // Generate button
@@ -421,7 +423,7 @@ struct CreateDeckView: View {
                     latexContent: combinedLatex,
                     userInstructions: aiInstructions,
                     rigor: cardRigor,
-                    quantityHint: Int(cardQuantity),
+                    quantityLevel: mapQuantity(quantityLevel),
                     apiKey: groqKey
                 )
                 print("Generated \(cards.count) cards")
@@ -438,6 +440,15 @@ struct CreateDeckView: View {
                     isProcessingAI = false
                 }
             }
+        }
+    }
+
+    private func mapQuantity(_ level: QuantityLevelUI) -> QuantityLevel {
+        switch level {
+        case .auto: return .auto
+        case .peu: return .peu
+        case .moyen: return .moyen
+        case .beaucoup: return .beaucoup
         }
     }
     
